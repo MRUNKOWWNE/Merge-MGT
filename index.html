@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Merge Cafe - Telegram Mini App</title>
+  <!-- Official Telegram WebApp Script -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg-color: #1a1b26;
+      --card-bg: #24283b;
+      --slot-bg: #16161e;
+      --accent: #ff9e64;
+      --accent-green: #9ece6a;
+      --text-main: #c0caf5;
+      --text-muted: #565f89;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Header Stats */
+    .header {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+      padding: 12px 16px;
+      border-radius: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .player-info {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .player-name {
+      color: #fff;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .balance-box {
+      text-align: right;
+    }
+
+    .coins {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .income-rate {
+      font-size: 12px;
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+
+    /* 3x4 Merge Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      width: 100%;
+      max-width: 400px;
+      background: var(--card-bg);
+      padding: 12px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+    }
+
+    .slot {
+      aspect-ratio: 1 / 1;
+      background: var(--slot-bg);
+      border-radius: 14px;
+      border: 2px dashed #2f3549;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+      cursor: pointer;
+    }
+
+    .slot.occupied {
+      border: 2px solid #414868;
+      background: linear-gradient(145deg, #292e42, #1f2335);
+    }
+
+    .slot.selected {
+      border-color: var(--accent);
+      transform: scale(1.05);
+      box-shadow: 0 0 15px rgba(255, 158, 100, 0.3);
+    }
+
+    .pet-emoji {
+      font-size: 38px;
+      line-height: 1;
+      margin-bottom: 4px;
+      pointer-events: none;
+    }
+
+    .pet-level {
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 2px 8px;
+      border-radius: 10px;
+      color: #fff;
+      pointer-events: none;
+    }
+
+    .pet-income {
+      font-size: 10px;
+      color: var(--accent-green);
+      margin-top: 2px;
+      pointer-events: none;
+    }
+
+    /* Controls & Monetization Hooks */
+    .controls {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-buy {
+      background: linear-gradient(90deg, #ff9e64, #f7768e);
+      color: #1a1b26;
+    }
+
+    .btn-buy:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-auto {
+      background: #292e42;
+      color: #7aa2f7;
+      border: 1px solid #414868;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="player-info">
+      <div>Cafe Owner</div>
+      <div class="player-name" id="playerName">Guest Player</div>
+    </div>
+    <div class="balance-box">
+      <div class="coins">🪙 <span id="coinDisplay">100</span></div>
+      <div class="income-rate">+<span id="incomeDisplay">0</span> / sec</div>
+    </div>
+  </div>
+
+  <div class="grid" id="gameGrid"></div>
+
+  <div class="controls">
+    <button class="btn btn-buy" id="buyBtn" onclick="buyPet()">
+      <span>🐱 Summon Lv.1 Cat</span>
+      <span id="costDisplay">🪙 50</span>
+    </button>
+
+    <button class="btn btn-auto" onclick="triggerAutoMerge()">
+      <span>⚡ Auto-Merge (Monetization Hook)</span>
+      <span>⭐ 10 Stars</span>
+    </button>
+  </div>
+
+  <div class="hint">Tap or drag two identical cats together to merge & boost income!</div>
+
+  <script>
+    // 1. Initialize Telegram WebApp SDK
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      const user = tg.initDataUnsafe?.user;
+      if (user) {
+        document.getElementById("playerName").innerText = user.first_name || user.username;
+      }
+    }
+
+    function haptic(type = "light") {
+      if (tg?.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred(type);
+      }
+    }
+
+    // 2. Game Configuration (Cat Tiers)
+    const TIERS = [
+      null,
+      { emoji: "🐱", name: "Stray Kitten", income: 2 },
+      { emoji: "🐈", name: "Tabby Cat", income: 6 },
+      { emoji: "🐈‍⬛", name: "Shadow Cat", income: 18 },
+      { emoji: "🦁", name: "Mane Lion", income: 55 },
+      { emoji: "🐯", name: "Royal Tiger", income: 160 },
+      { emoji: "🐆", name: "Cyber Leopard", income: 480 },
+      { emoji: "👑", name: "Cat Emperor", income: 1500 }
+    ];
+
+    // 3. Game State (Saved locally for prototype; move to backend DB for production)
+    let state = JSON.parse(localStorage.getItem("mergeCafeState")) || {
+      coins: 120,
+      buyCost: 50,
+      grid: [1, 1, null, null, null, null, null, null, null, null, null, null] // 12 slots
+    };
+
+    let selectedSlot = null;
+    let draggedSlot = null;
+
+    function saveState() {
+      localStorage.setItem("mergeCafeState", JSON.stringify(state));
+    }
+
+    function formatNumber(num) {
+      if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
+      if (num >= 1e3) return (num / 1e3).toFixed(1) + "K";
+      return Math.floor(num);
+    }
+
+    function getIncomePerSecond() {
+      return state.grid.reduce((sum, level) => {
+        return sum + (level && TIERS[level] ? TIERS[level].income : 0);
+      }, 0);
+    }
+
+    // 4. Render Grid & UI
+    function render() {
+      const gridEl = document.getElementById("gameGrid");
+      gridEl.innerHTML = "";
+
+      state.grid.forEach((level, index) => {
+        const slot = document.createElement("div");
+        slot.className = "slot" + (level ? " occupied" : "") + (selectedSlot === index ? " selected" : "");
+        slot.dataset.index = index;
+
+        if (level && TIERS[level]) {
+          slot.draggable = true;
+          slot.innerHTML = `
+            <div class="pet-emoji">${TIERS[level].emoji}</div>
+            <div class="pet-level">Lv.${level}</div>
+            <div class="pet-income">+${TIERS[level].income}/s</div>
+          `;
+
+          // Desktop Drag & Drop
+          slot.addEventListener("dragstart", () => { draggedSlot = index; });
+        }
+
+        slot.addEventListener("dragover", (e) => e.preventDefault());
+        slot.addEventListener("drop", () => {
+          if (draggedSlot !== null && draggedSlot !== index) {
+            handleMoveOrMerge(draggedSlot, index);
+            draggedSlot = null;
+          }
+        });
+
+        // Mobile-friendly Tap-to-Select & Merge
+        slot.addEventListener("click", () => handleSlotClick(index));
+
+        gridEl.appendChild(slot);
+      });
+
+      const income = getIncomePerSecond();
+      document.getElementById("coinDisplay").innerText = formatNumber(state.coins);
+      document.getElementById("incomeDisplay").innerText = formatNumber(income);
+      document.getElementById("costDisplay").innerText = `🪙 ${formatNumber(state.buyCost)}`;
+
+      const hasEmptySlot = state.grid.includes(null);
+      const buyBtn = document.getElementById("buyBtn");
+      buyBtn.disabled = state.coins < state.buyCost || !hasEmptySlot;
+    }
+
+    // 5. Core Merge & Movement Logic
+    function handleSlotClick(index) {
+      if (selectedSlot === null) {
+        if (state.grid[index] !== null) {
+          selectedSlot = index;
+          haptic("light");
+          render();
+        }
+        return;
+      }
+
+      if (selectedSlot === index) {
+        selectedSlot = null;
+        render();
+        return;
+      }
+
+      handleMoveOrMerge(selectedSlot, index);
+      selectedSlot = null;
+      render();
+    }
+
+    function handleMoveOrMerge(fromIdx, toIdx) {
+      const fromLevel = state.grid[fromIdx];
+      const toLevel = state.grid[toIdx];
+
+      if (fromLevel === null) return;
+
+      // Case A: Move to empty slot
+      if (toLevel === null) {
+        state.grid[toIdx] = fromLevel;
+        state.grid[fromIdx] = null;
+        haptic("light");
+      }
+      // Case B: Merge identical levels
+      else if (fromLevel === toLevel && fromLevel < TIERS.length - 1) {
+        state.grid[toIdx] = fromLevel + 1;
+        state.grid[fromIdx] = null;
+        haptic("heavy");
+      }
+      // Case C: Swap two different items
+      else {
+        state.grid[toIdx] = fromLevel;
+        state.grid[fromIdx] = toLevel;
+        haptic("light");
+      }
+
+      saveState();
+      render();
+    }
+
+    function buyPet() {
+      const emptyIndex = state.grid.indexOf(null);
+      if (emptyIndex === -1 || state.coins < state.buyCost) return;
+
+      state.coins -= state.buyCost;
+      state.grid[emptyIndex] = 1;
+      state.buyCost = Math.ceil(state.buyCost * 1.25); // Exponential price scaling
+      haptic("medium");
+      saveState();
+      render();
+    }
+
+    // Monetization Hook Example (Pairs two matching cats automatically)
+    function triggerAutoMerge() {
+      for (let i = 0; i < state.grid.length; i++) {
+        for (let j = i + 1; j < state.grid.length; j++) {
+          if (state.grid[i] && state.grid[i] === state.grid[j] && state.grid[i] < TIERS.length - 1) {
+            handleMoveOrMerge(j, i);
+            return;
+          }
+        }
+      }
+      if (tg?.showAlert) {
+        tg.showAlert("No matching cats available to merge right now!");
+      } else {
+        alert("No matching cats available to merge right now!");
+      }
+    }
+
+    // 6. Passive Income Tick (Every 1 Second)
+    setInterval(() => {
+      const income = getIncomePerSecond();
+      if (income > 0) {
+        state.coins += income;
+        saveState();
+        document.getElementById("coinDisplay").innerText = formatNumber(state.coins);
+      }
+    }, 1000);
+
+    render();
+  </script>
+</body>
+</html>
